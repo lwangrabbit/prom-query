@@ -5,6 +5,7 @@ go 1.17
 require (
 	github.com/cespare/xxhash v1.1.0
 	github.com/gogo/protobuf v1.1.1
+	github.com/google/go-querystring v1.1.0
 	github.com/prometheus/common v0.37.0
 	golang.org/x/net v0.2.0
 )

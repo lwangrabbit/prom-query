@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/go-querystring/query"
 	config_util "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 	"golang.org/x/net/context/ctxhttp"
@@ -56,17 +57,47 @@ func (c Client) Name() string {
 	return fmt.Sprintf("%d:%s", c.index, c.url)
 }
 
-func (c *Client) instantQueryUrl(query string, ts int64) string {
-	return fmt.Sprintf("%v/api/v1/query?query=%v&time=%v", c.url.String(), query, ts)
+func (c *Client) instantQueryUrl(qs string, ts int64) (string, error) {
+	p := struct {
+		Query string `url:"query"`
+		Time  int64  `url:"time"`
+	}{
+		Query: qs,
+		Time:  ts,
+	}
+	v, err := query.Values(p)
+	if err != nil {
+		return "", nil
+	}
+	return fmt.Sprintf("%v/api/v1/query?%v", c.url.String(), v.Encode()), nil
 }
 
-func (c *Client) rangeQueryUrl(query string, startTs, endTs int64, step int) string {
-	return fmt.Sprintf("%v/api/v1/query_range?query=%v&start=%v&end=%v&step=%v", c.url.String(), query, startTs, endTs, step)
+func (c *Client) rangeQueryUrl(qs string, startTs, endTs int64, step int) (string, error) {
+	p := struct {
+		Query string `url:"query"`
+		Start int64  `url:"start"`
+		End   int64  `url:"end"`
+		Step  int    `url:"step"`
+	}{
+		Query: qs,
+		Start: startTs,
+		End:   endTs,
+		Step:  step,
+	}
+	v, err := query.Values(p)
+	if err != nil {
+		return "", nil
+	}
+	return fmt.Sprintf("%v/api/v1/query_range?%v", c.url.String(), v.Encode()), nil
 }
 
 // QueryInstant execute instant query to a remote endpoint.
-func (c *Client) QueryInstant(ctx context.Context, query string, ts int64) (*InstantQueryResult, error) {
-	httpReq, err := http.NewRequest("GET", c.instantQueryUrl(query, ts), nil)
+func (c *Client) QueryInstant(ctx context.Context, qs string, ts int64) (*InstantQueryResult, error) {
+	url, err := c.instantQueryUrl(qs, ts)
+	if err != nil {
+		return nil, err
+	}
+	httpReq, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create request: %v", err)
 	}
@@ -107,8 +138,12 @@ type InstantQueryData struct {
 }
 
 // QueryRange execute range query to a remote endpoint.
-func (c *Client) QueryRange(ctx context.Context, query string, startTs, endTs int64, step int) (*RangeQueryResult, error) {
-	httpReq, err := http.NewRequest("GET", c.rangeQueryUrl(query, startTs, endTs, step), nil)
+func (c *Client) QueryRange(ctx context.Context, qs string, startTs, endTs int64, step int) (*RangeQueryResult, error) {
+	url, err := c.rangeQueryUrl(qs, startTs, endTs, step)
+	if err != nil {
+		return nil, err
+	}
+	httpReq, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create request: %v", err)
 	}
